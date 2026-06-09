@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Démo Carrousel</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      background: #fff;
+    }
+
+    .page {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: 1fr auto;
+    }
+
+    /* ── CARROUSEL ── */
+    .stack-section {
+      position: relative;
+      min-height: 0; overflow: hidden;
+    }
+    .stack-section::before,
+    .stack-section::after {
+      content: ''; position: absolute; top: 0; bottom: 0; z-index: 8; pointer-events: none;
+      width: clamp(50px, 10vw, 120px);
+    }
+    .stack-section::before { left:  0; background: linear-gradient(to right, #fff 20%, transparent); }
+    .stack-section::after  { right: 0; background: linear-gradient(to left,  #fff 20%, transparent); }
+
+    .stack-viewport {
+      perspective: 1100px;
+      perspective-origin: 50% 50%;
+      position: absolute; inset: 0;
+      overflow: hidden; cursor: grab;
+    }
+    .stack-viewport:active { cursor: grabbing; }
+    .stack-track { position: absolute; inset: 0; }
+
+    /* ── CARTES ── */
+    .flyer-card {
+      position: absolute;
+      width: 280px; height: 420px;
+      left: calc(50% - 140px);
+      top:  calc(50% - 210px);
+      border-radius: 20px; overflow: hidden;
+      isolation: isolate;
+      transition: transform .46s cubic-bezier(.34,1.15,.64,1), opacity .38s ease;
+      will-change: transform, opacity;
+      cursor: pointer;
+    }
+    .flyer-card[data-diff="-3"] { transform: translateX(-270px) scale(.54) rotateY(-20deg); opacity: 0;   pointer-events: none; z-index: 1; }
+    .flyer-card[data-diff="-2"] { transform: translateX(-192px) scale(.68) rotateY(-12deg); opacity: .72; z-index: 2; }
+    .flyer-card[data-diff="-1"] { transform: translateX(-108px) scale(.82) rotateY(-6deg);  opacity: 1;   z-index: 4; }
+    .flyer-card[data-diff="0"]  { transform: translateX(0)      scale(1)   rotateY(0deg);   opacity: 1;   z-index: 5;
+      box-shadow: 0 20px 50px rgba(0,0,0,.16); }
+    .flyer-card[data-diff="1"]  { transform: translateX( 108px) scale(.82) rotateY(6deg);   opacity: 1;   z-index: 4; }
+    .flyer-card[data-diff="2"]  { transform: translateX( 192px) scale(.68) rotateY(12deg);  opacity: .72; z-index: 2; }
+    .flyer-card[data-diff="3"]  { transform: translateX( 270px) scale(.54) rotateY(20deg);  opacity: 0;   pointer-events: none; z-index: 1; }
+
+    .card-bg { position: absolute; inset: 0; }
+
+    /* ── FLÈCHES ── */
+    .arrows-bar {
+      position: absolute;
+      top: calc(50% + 222px);
+      left: 50%; transform: translateX(-50%);
+      display: flex; gap: 2.2rem; z-index: 20;
+    }
+    .nav-arrow {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #1a1a1a; border: none;
+      color: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s, opacity .2s, transform .16s;
+    }
+    .nav-arrow:hover  { background: #000; }
+    .nav-arrow:active { transform: scale(.86); }
+    .nav-arrow.edge   { opacity: .18; pointer-events: none; }
+    .nav-arrow svg    { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── POINTS ── */
+    .dots-row {
+      display: flex; align-items: center; justify-content: center;
+      padding: .6rem 0 max(1.4rem, env(safe-area-inset-bottom, 0px) + .8rem);
+    }
+    .stack-dots { display: flex; align-items: center; gap: .5rem; }
+    .dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: rgba(0,0,0,.18); border: none; padding: 0;
+      cursor: pointer; transition: background .3s, transform .3s;
+    }
+    .dot.active { background: #1a1a1a; transform: scale(1.5); }
+
+    /* ── LIGHTBOX ── */
+    .lightbox {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.85);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; opacity: 0; pointer-events: none;
+      transition: opacity .3s ease; cursor: zoom-out;
+    }
+    .lightbox.open { opacity: 1; pointer-events: all; }
+    .lightbox-inner {
+      position: relative;
+      height: min(88dvh, calc(78vw * 1.5));
+      width:  min(78vw,  calc(88dvh * 0.667));
+      border-radius: 18px; overflow: hidden;
+      cursor: default;
+      transform: scale(.84);
+      transition: transform .42s cubic-bezier(.34,1.2,.64,1);
+      box-shadow: 0 48px 120px rgba(0,0,0,.5);
+    }
+    .lightbox.open .lightbox-inner { transform: scale(1); }
+    .lightbox-bg { position: absolute; inset: 0; }
+    .lightbox-close {
+      position: absolute; top: .7rem; right: .7rem; z-index: 5;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(0,0,0,.55); border: none;
+      color: #fff; font-size: .78rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .lightbox-close:hover { background: #000; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .flyer-card { width: 250px; height: 375px; left: calc(50% - 125px); top: calc(50% - 187px); }
+      .flyer-card[data-diff="-2"] { transform: translateX(-182px) scale(.68) rotateY(-12deg); }
+      .flyer-card[data-diff="-1"] { transform: translateX(-102px) scale(.82) rotateY(-6deg); }
+      .flyer-card[data-diff="1"]  { transform: translateX( 102px) scale(.82) rotateY(6deg); }
+      .flyer-card[data-diff="2"]  { transform: translateX( 182px) scale(.68) rotateY(12deg); }
+      .arrows-bar { top: calc(50% + 199px); }
+    }
+    @media (max-width: 600px) {
+      .flyer-card { width: 210px; height: 315px; left: calc(50% - 105px); top: calc(50% - 157px); }
+      .flyer-card[data-diff="-2"] { transform: translateX(-154px) scale(.68) rotateY(-12deg); }
+      .flyer-card[data-diff="-1"] { transform: translateX(-86px) scale(.82) rotateY(-6deg); }
+      .flyer-card[data-diff="1"]  { transform: translateX( 86px) scale(.82) rotateY(6deg); }
+      .flyer-card[data-diff="2"]  { transform: translateX( 154px) scale(.68) rotateY(12deg); }
+      .arrows-bar { top: calc(50% + 169px); gap: 2rem; }
+    }
+    @media (max-width: 380px) {
+      .flyer-card { width: 178px; height: 267px; left: calc(50% - 89px); top: calc(50% - 133px); }
+      .flyer-card[data-diff="-1"] { transform: translateX(-74px) scale(.82) rotateY(-6deg); }
+      .flyer-card[data-diff="1"]  { transform: translateX( 74px) scale(.82) rotateY(6deg); }
+      .arrows-bar { top: calc(50% + 145px); }
+    }
+    @media (max-height: 620px) {
+      .flyer-card { width: 180px; height: 270px; left: calc(50% - 90px); top: calc(50% - 135px); }
+      .flyer-card[data-diff="-1"] { transform: translateX(-76px) scale(.82) rotateY(-6deg); }
+      .flyer-card[data-diff="1"]  { transform: translateX( 76px) scale(.82) rotateY(6deg); }
+      .arrows-bar { top: calc(50% + 147px); }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <section class="stack-section">
+    <div class="stack-viewport" id="stackViewport">
+      <div class="stack-track" id="stackTrack"></div>
+    </div>
+    <div class="arrows-bar">
+      <button class="nav-arrow" id="prevBtn" aria-label="Précédent">
+        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+      </button>
+      <button class="nav-arrow" id="nextBtn" aria-label="Suivant">
+        <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <div class="dots-row">
+    <div class="stack-dots" id="stackDots"></div>
+  </div>
+
+</div>
+
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-inner" id="lightboxInner">
+    <div class="lightbox-bg" id="lightboxBg"></div>
+    <button class="lightbox-close" id="lightboxClose">✕</button>
+  </div>
+</div>
+
+<script>
+  const COLORS = ['#3d1a10','#0f1e2d','#3d2b0a','#0d2d2b','#1e0d30'];
+  const NAV_COOLDOWN = 380;
+
+  let current     = 0;
+  let lastNavTime = 0;
+
+  function build() {
+    const track = document.getElementById('stackTrack');
+    track.innerHTML = '';
+    COLORS.forEach((color, i) => {
+      const diff = Math.max(-3, Math.min(3, i - current));
+      const card = document.createElement('div');
+      card.className    = 'flyer-card';
+      card.dataset.diff  = diff;
+      card.dataset.index = i;
+      card.innerHTML     = `<div class="card-bg" style="background:${color}"></div>`;
+      card.addEventListener('click', () => {
+        const d = i - current;
+        if (d === 0) openLightbox(color);
+        else         navigate(d > 0 ? 1 : -1);
+      });
+      track.appendChild(card);
+    });
+    buildDots();
+    updateArrows();
+  }
+
+  function buildDots() {
+    const wrap = document.getElementById('stackDots');
+    wrap.innerHTML = '';
+    COLORS.forEach((_, i) => {
+      const d = document.createElement('button');
+      d.className = 'dot' + (i === current ? ' active' : '');
+      d.setAttribute('aria-label', `Carte ${i + 1}`);
+      d.addEventListener('click', () => navigate(i - current));
+      wrap.appendChild(d);
+    });
+  }
+
+  function syncDOM() {
+    document.querySelectorAll('.flyer-card').forEach(card => {
+      card.dataset.diff = Math.max(-3, Math.min(3, parseInt(card.dataset.index) - current));
+    });
+    document.querySelectorAll('.dot').forEach((d, i) =>
+      d.classList.toggle('active', i === current)
+    );
+    updateArrows();
+  }
+
+  function navigate(delta) {
+    const now = Date.now();
+    if (now - lastNavTime < NAV_COOLDOWN) return;
+    lastNavTime = now;
+    const next = current + delta;
+    if (next < 0 || next >= COLORS.length) return;
+    current = next;
+    syncDOM();
+  }
+
+  function updateArrows() {
+    document.getElementById('prevBtn').classList.toggle('edge', current === 0);
+    document.getElementById('nextBtn').classList.toggle('edge', current === COLORS.length - 1);
+  }
+
+  /* ── Lightbox ── */
+  function openLightbox(color) {
+    document.getElementById('lightboxBg').style.background = color;
+    document.getElementById('lightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+  }
+  document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+  document.getElementById('lightbox').addEventListener('click', e => {
+    if (e.target === document.getElementById('lightbox')) closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeLightbox();
+    if (document.getElementById('lightbox').classList.contains('open')) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navigate(-1);
+  });
+
+  /* ── Touch / drag ── */
+  const vp = document.getElementById('stackViewport');
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) < 25) return;
+    navigate(delta > 0 ? 1 : -1);
+  }, { passive: false });
+
+  let dragX = 0, dragging = false;
+  vp.addEventListener('mousedown',  e => { dragging = true; dragX = e.clientX; });
+  window.addEventListener('mouseup', e => {
+    if (!dragging) return; dragging = false;
+    const dx = dragX - e.clientX;
+    if (Math.abs(dx) > 40) navigate(dx > 0 ? 1 : -1);
+  });
+
+  let touchX = 0;
+  vp.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+  vp.addEventListener('touchend',   e => {
+    const dx = touchX - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 40) navigate(dx > 0 ? 1 : -1);
+  });
+
+  build();
+</script>
+</body>
+</html>
